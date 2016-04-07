@@ -4,7 +4,7 @@ namespace :deploy do
 
     group_name = fetch(:autoscaling_group_name)
 
-    if Capistrano::AutoScaling.new.autoscaling_event_in_progress?(group_name)
+    if Kitman::Cap::Autoscale.new.autoscaling_event_in_progress?(group_name)
       fail "Failing Deployment - Auto Scaling activity in progress for group: #{group_name}"
     end
   end
