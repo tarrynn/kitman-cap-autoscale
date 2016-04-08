@@ -3,9 +3,6 @@ require 'aws-sdk'
 module Kitman
   module Cap
     class Autoscale
-
-      VERSION = "1.0.1"
-
       STATE_NAME_FILTER = 'instance-state-name'
       RUNNING_STATE = 'running'
 
