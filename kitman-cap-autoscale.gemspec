@@ -1,11 +1,10 @@
 # coding: utf-8
 lib = File.expand_path('../lib', __FILE__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
-require 'kitman/cap/autoscale'
 
 Gem::Specification.new do |spec|
   spec.name          = "kitman-cap-autoscale"
-  spec.version       = Kitman::Cap::Autoscale::VERSION
+  spec.version       = "1.0.1"
   spec.authors       = ["wal"]
   spec.email         = ["wal@kitmanlabs.com"]
   spec.summary       = "Capistrano tasks for utilizing AWS Auto Scaling"
