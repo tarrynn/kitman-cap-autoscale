@@ -4,7 +4,7 @@ $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
 Gem::Specification.new do |spec|
   spec.name          = "kitman-cap-autoscale"
-  spec.version       = "1.0.2"
+  spec.version       = "1.0.3"
   spec.authors       = ["wal"]
   spec.email         = ["wal@kitmanlabs.com"]
   spec.summary       = "Capistrano tasks for utilizing AWS Auto Scaling"
@@ -16,9 +16,9 @@ Gem::Specification.new do |spec|
 
   spec.add_development_dependency 'bundler', '~> 1.11'
   spec.add_development_dependency 'rake', '~> 10.0'
-  spec.add_development_dependency 'rspec', '~> 3.0'
+  spec.add_development_dependency 'rspec', '~> 3.7'
   spec.add_development_dependency 'dotenv', '~> 2.0'
 
   spec.add_runtime_dependency 'capistrano', '>= 3.0.0'
-  spec.add_runtime_dependency 'aws-sdk', '~> 2'
+  spec.add_runtime_dependency 'aws-sdk', '~> 3'
 end
