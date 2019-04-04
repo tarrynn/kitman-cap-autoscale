@@ -11,10 +11,6 @@ describe Kitman::Cap::Autoscale do
     subject.ec2_client = @stub_ec2_client
   end
 
-  it 'has a version number' do
-    expect(Kitman::Cap::Autoscale::VERSION).not_to be nil
-  end
-
   context '#autoscaling_event_in_progress' do
 
     it 'returns false if no autoscaling event in progress' do
@@ -72,7 +68,8 @@ describe Kitman::Cap::Autoscale do
         availability_zone: 'eu-west-1a',
         lifecycle_state: 'Running',
         health_status: 'Healthy',
-        launch_configuration_name: 'Launch Config #1'
+        launch_configuration_name: 'Launch Config #1',
+        protected_from_scale_in: false
       }
     }
 
@@ -82,7 +79,8 @@ describe Kitman::Cap::Autoscale do
         availability_zone: 'eu-west-1c',
         lifecycle_state: 'Running',
         health_status: 'Healthy',
-        launch_configuration_name: 'Launch Config #1'
+        launch_configuration_name: 'Launch Config #1',
+        protected_from_scale_in: false
       }
     }
 
