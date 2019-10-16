@@ -1,0 +1,17 @@
+name: Ruby CI
+
+on: push
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: ruby:2.5.1
+    steps:
+    - uses: actions/checkout@v1
+    - name: Install Dependencies
+      run: |
+        bundle install
+    - name: Run specs
+      run: |
+        bundle exec rspec
