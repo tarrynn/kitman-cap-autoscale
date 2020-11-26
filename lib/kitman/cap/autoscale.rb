@@ -15,6 +15,7 @@ module Kitman
 
       attr_accessor :auto_scaling_client
       attr_accessor :ec2_client
+      attr_accessor :elastic_balancing_client
 
       def hosts_in_autoscaling_group(group_name)
         hosts = []
@@ -77,10 +78,6 @@ module Kitman
         )
 
         resp.auto_scaling_groups.first
-      end
-
-      def describe_target_group(target_group_arns)
-        elastic_balancing_client.describe_target_groups(target_group_arns: [target_group_arn]).first
       end
 
       def get_healthy_targets(arn)

@@ -1,22 +1,53 @@
 require 'spec_helper'
 
 describe Kitman::Cap::Autoscale do
-
   TEST_AUTOSCALING_GROUP_NAME = 'test-group-name'
 
+  let(:subject) { described_class.new }
+
+  let(:asg) do
+    {
+      auto_scaling_group_arn: "arn:aws:autoscaling:eu-west-1:123456789012:autoScalingGroup:930d940e-891e-4781-a11a-7b0acd480f03:autoScalingGroupName/test-group-name",
+      auto_scaling_group_name: "test-group-name",
+      availability_zones: ["eu-west-1"],
+      created_time: Time.now,
+      default_cooldown: 300,
+      desired_capacity: 0,
+      health_check_type: "EC2",
+      max_size: 1,
+      min_size: 0,
+      target_group_arns: [
+        "arn:aws:elasticloadbalancing:eu-west-1:123456789012:targetgroup/staging/11111111111111"
+      ]
+    }
+  end
+
+  let(:healthy_host) do
+    {
+      health_check_port: "80",
+      target: {
+        id: "i-0f76fade",
+        port: 80,
+      },
+      target_health: {
+        state: "healthy",
+      }
+    }
+  end
+
   before :each do
-    @stub_auto_scaling_client = Aws::AutoScaling::Client.new(stub_responses: true)
-    subject.auto_scaling_client = @stub_auto_scaling_client
-    @stub_ec2_client = Aws::EC2::Client.new(stub_responses: true)
-    subject.ec2_client = @stub_ec2_client
-    @stub_elastic_balancing_client = Aws::ElasticLoadBalancingV2::Client.new(stub_responses: true)
-    subject.elastic_balancing_client = @stub_elastic_balancing_client
+    subject.auto_scaling_client = Aws::AutoScaling::Client.new(stub_responses: true)
+    subject.ec2_client = Aws::EC2::Client.new(stub_responses: true)
+    subject.elastic_balancing_client = Aws::ElasticLoadBalancingV2::Client.new(stub_responses: true)
   end
 
   context '#autoscaling_event_in_progress' do
-
     it 'returns false if no autoscaling event in progress' do
-      @stub_auto_scaling_client.stub_responses(:describe_scaling_activities, activities: [])
+      subject.auto_scaling_client.stub_data(:describe_auto_scaling_groups, { auto_scaling_groups: [asg] })
+      subject.elastic_balancing_client.stub_data(:describe_target_health, { target_health_descriptions: [healthy_host] })
+
+      p subject.get_autoscaling_group(TEST_AUTOSCALING_GROUP_NAME).inspect
+
       expect(subject.autoscaling_event_in_progress?(TEST_AUTOSCALING_GROUP_NAME)).to be(false)
     end
 
