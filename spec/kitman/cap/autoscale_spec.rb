@@ -35,48 +35,64 @@ describe Kitman::Cap::Autoscale do
     }
   end
 
+  let(:unhealthy_host) do
+    {
+      health_check_port: "80",
+      target: {
+        id: "i-0f76fabc",
+        port: 80,
+      },
+      target_health: {
+        state: "unhealthy",
+      }
+    }
+  end
+
+  let(:booting_host) do
+    {
+      health_check_port: "80",
+      target: {
+        id: "i-0f76fabc",
+        port: 80,
+      },
+      target_health: {
+        state: "initial",
+      }
+    }
+  end
+
   before :each do
-    subject.auto_scaling_client = Aws::AutoScaling::Client.new(stub_responses: true)
-    subject.ec2_client = Aws::EC2::Client.new(stub_responses: true)
-    subject.elastic_balancing_client = Aws::ElasticLoadBalancingV2::Client.new(stub_responses: true)
+    @auto_scaling_client = Aws::AutoScaling::Client.new(stub_responses: true)
+    subject.auto_scaling_client = @auto_scaling_client
+    @ec2_client = Aws::EC2::Client.new(stub_responses: true)
+    subject.ec2_client = @ec2_client
+    @elastic_balancing_client = Aws::ElasticLoadBalancingV2::Client.new(stub_responses: true)
+    subject.elastic_balancing_client = @elastic_balancing_client
   end
 
   context '#autoscaling_event_in_progress' do
     it 'returns false if no autoscaling event in progress' do
-      subject.auto_scaling_client.stub_data(:describe_auto_scaling_groups, { auto_scaling_groups: [asg] })
-      subject.elastic_balancing_client.stub_data(:describe_target_health, { target_health_descriptions: [healthy_host] })
-
-      p subject.get_autoscaling_group(TEST_AUTOSCALING_GROUP_NAME).inspect
-
+      @auto_scaling_client.stub_responses(:describe_auto_scaling_groups, { auto_scaling_groups: [asg] })
+      @elastic_balancing_client.stub_responses(:describe_target_health, { target_health_descriptions: [healthy_host] })
       expect(subject.autoscaling_event_in_progress?(TEST_AUTOSCALING_GROUP_NAME)).to be(false)
     end
 
-    it 'returns true if an autoscaling event is in progress' do
+    it 'returns true if a host is unhealthy' do
+      @auto_scaling_client.stub_responses(:describe_auto_scaling_groups, { auto_scaling_groups: [asg] })
+      @elastic_balancing_client.stub_responses(:describe_target_health, {
+        target_health_descriptions: [healthy_host, unhealthy_host]
+      })
 
-      in_progress_scaling_activity = {
-        activity_id: 'ABC-123',
-        auto_scaling_group_name: TEST_AUTOSCALING_GROUP_NAME,
-        cause: 'Instance Failure',
-        start_time: Time.now,
-        status_code: 'In Progress'
-      }
-
-      @stub_auto_scaling_client.stub_responses(:describe_scaling_activities, activities: [in_progress_scaling_activity])
       expect(subject.autoscaling_event_in_progress?(TEST_AUTOSCALING_GROUP_NAME)).to be(true)
     end
 
-    it 'returns true if only activities are successful ones' do
+    it 'returns true if a host is booting up' do
+      @auto_scaling_client.stub_responses(:describe_auto_scaling_groups, { auto_scaling_groups: [asg] })
+      @elastic_balancing_client.stub_responses(:describe_target_health, {
+        target_health_descriptions: [healthy_host, booting_host]
+      })
 
-      successful_scaling_activity = {
-        activity_id: 'ABC-123',
-        auto_scaling_group_name: TEST_AUTOSCALING_GROUP_NAME,
-        cause: 'Instance Failure',
-        start_time: Time.now,
-        status_code: 'Successful'
-      }
-
-      @stub_auto_scaling_client.stub_responses(:describe_scaling_activities, activities: [successful_scaling_activity])
-      expect(subject.autoscaling_event_in_progress?(TEST_AUTOSCALING_GROUP_NAME)).to be(false)
+      expect(subject.autoscaling_event_in_progress?(TEST_AUTOSCALING_GROUP_NAME)).to be(true)
     end
   end
 

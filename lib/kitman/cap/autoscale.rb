@@ -112,15 +112,15 @@ module Kitman
       end
 
       def auto_scaling_client
-        Aws::AutoScaling::Client.new(capistrano_aws_credentials)
+        @auto_scaling_client ||= Aws::AutoScaling::Client.new(capistrano_aws_credentials)
       end
 
       def ec2_client
-        Aws::EC2::Client.new(capistrano_aws_credentials)
+        @ec2_client ||= Aws::EC2::Client.new(capistrano_aws_credentials)
       end
 
       def elastic_balancing_client
-        Aws::ElasticLoadBalancingV2::Client.new(capistrano_aws_credentials)
+        @elastic_balancing_client ||= Aws::ElasticLoadBalancingV2::Client.new(capistrano_aws_credentials)
       end
 
       def capistrano_aws_credentials
