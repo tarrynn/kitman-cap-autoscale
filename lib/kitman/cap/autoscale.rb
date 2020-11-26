@@ -19,40 +19,44 @@ module Kitman
       def hosts_in_autoscaling_group(group_name)
         hosts = []
 
-        log "Checking target group: #{group_name}"
+        log "Checking autoscaling group: #{group_name}"
         asg = get_autoscaling_group(group_name)
 
         unless asg.nil?
-          load_balancers = get_load_balancers(asg.load_balancer_names)
-
-          raise "No load balancers found for autoscaling group: '#{group}'" if load_balancers.empty?
-
-          log "Discovered #{load_balancers.count} load balancers for autoscaling group: '#{group_name}'"
-
-          target_groups = get_target_groups_from_load_balancers(load_balancers)
-
-          raise "No target groups for autoscaling group: '#{group}'" if target_groups.empty?
-
-          target_groups.each do |group|
-            healthy_targets = get_healthy_targets(group)
-            log "Discovered #{healthy_targets.count} instances for target group: '#{group}'"
-            healthy_targets.each do |instance|
-              hosts << public_dns_name_from_instance_id(instance.target.id)
+          unless asg.target_group_arns.empty?
+            asg.target_group_arns.each do |arn|
+              healthy_targets = get_healthy_targets(arn)
+              log "Discovered #{healthy_targets.count} instances for target group: '#{arn}'"
+              healthy_targets.each do |instance|
+                hosts << public_dns_name_from_instance_id(instance.target.id)
+              end
             end
-          end
 
-          log "Located hosts #{hosts.join(', ')}"
-          hosts
+            log "Located hosts #{hosts.join(', ')}"
+            hosts
+          else
+            raise "No target groups for autoscaling group: '#{group_name}'"
+          end
         else
-          raise "Autoscaling group: '#{group}' not found"
+          raise "Autoscaling group: '#{group_name}' not found"
         end
       end
 
       def autoscaling_event_in_progress?(group_name)
-        group = get_target_group(group_name)
-        unhealthy_targets = get_unhealthy_targets(group)
+        asg = get_autoscaling_group(group_name)
 
-        unhealthy_targets.any?
+        unless asg.nil?
+          unless asg.target_group_arns.empty?
+            asg.target_group_arns.each do |arn|
+              unhealthy_targets = get_unhealthy_targets(group)
+              return true if unhealthy_targets.any?
+            end
+          else
+            raise "No target groups for autoscaling group: '#{group_name}'"
+          end
+        else
+          raise "Autoscaling group: '#{group_name}' not found"
+        end
       end
 
       private
@@ -66,57 +70,28 @@ module Kitman
       end
 
       def get_autoscaling_group(autoscaling_group_name)
-        describe_auto_scaling_groups_response = auto_scaling_client.describe_auto_scaling_groups(
-          auto_scaling_group_names: [autoscaling_group_name])
+        resp = auto_scaling_client.describe_auto_scaling_groups(
+          auto_scaling_group_names: [autoscaling_group_name]
+        )
 
-        describe_auto_scaling_groups_response.auto_scaling_groups.first
+        resp.auto_scaling_groups.first
       end
 
       def describe_target_group(target_group_arns)
         elastic_balancing_client.describe_target_groups(target_group_arns: [target_group_arn]).first
       end
 
-      def get_load_balancers(names)
-        resp = elastic_balancing_client.resp = elastic_balancing_client.describe_target_health({
-          names: names,
-        })
-
-        resp.load_balancers
-      end
-
-      def describe_load_balancer_listeners(load_balancer_arn)
-        resp = client.describe_listeners({
-          load_balancer_arn: load_balancer_arn
-        })
-
-        resp.listeners
-      end
-
-      def get_healthy_targets(group)
+      def get_healthy_targets(arn)
         resp = elastic_balancing_client.describe_target_health({
-          target_group_arn: group.target_group_arn,
+          target_group_arn: arn,
         })
 
         resp.target_health_descriptions.select { |instance| instance.target_health.state == HEALTHY_STATE }
       end
 
-      def get_target_groups_from_load_balancers(load_balancers)
-        target_groups = []
-        load_balancers.each do |lb|
-          listeners = describe_load_balancer_listeners(lb.load_balancer_arn)
-          listeners.each do |listener|
-            target_group = listener.default_actions.find { |action| action.type == "forward" }
-            tg = describe_target_group(target_group.target_group_arn)
-            target_groups << tg.target_group_name
-          end
-        end
-
-        target_groups
-      end
-
-      def get_unhealthy_targets(group)
+      def get_unhealthy_targets(arn)
         resp = elastic_balancing_client.describe_target_health({
-          target_group_arn: group[:target_group_arn],
+          target_group_arn: arn,
         })
 
         resp.target_health_descriptions.select { |instance| instance.target_health.state != HEALTHY_STATE }
