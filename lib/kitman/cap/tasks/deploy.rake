@@ -8,4 +8,6 @@ namespace :deploy do
       fail "Failing Deployment - Auto Scaling activity in progress for group: #{group_name}"
     end
   end
+
+  before :starting, :check_autoscaling_event_in_progress
 end
