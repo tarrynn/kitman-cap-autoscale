@@ -1,17 +1,23 @@
-name: Ruby CI
+name: Ruby
 
 on: push
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    container:
-      image: ruby:2.5.1
+    strategy:
+      matrix:
+        ruby_version: [2.5.x, 2.6.x, 2.7.x]
+
     steps:
-    - uses: actions/checkout@v1
-    - name: Install Dependencies
-      run: |
-        bundle install
-    - name: Run specs
-      run: |
-        bundle exec rspec
+    - uses: actions/checkout@v2
+    - name: Set up Ruby
+      uses: actions/setup-ruby@v1
+      with:
+        ruby-version: ${{ matrix.ruby_version }}
+    - name: Install bundler
+      run: gem install bundler
+    - name: Install dependencies with bundler
+      run: bundle install
+    - name: Run tests
+      run: bundle exec rspec
