@@ -9,6 +9,8 @@ describe Kitman::Cap::Autoscale do
     subject.auto_scaling_client = @stub_auto_scaling_client
     @stub_ec2_client = Aws::EC2::Client.new(stub_responses: true)
     subject.ec2_client = @stub_ec2_client
+    @stub_elastic_balancing_client = Aws::ElasticLoadBalancingV2::Client.new(stub_responses: true)
+    subject.elastic_balancing_client = @stub_elastic_balancing_client
   end
 
   context '#autoscaling_event_in_progress' do

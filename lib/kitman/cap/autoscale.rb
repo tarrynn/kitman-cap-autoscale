@@ -48,9 +48,11 @@ module Kitman
         unless asg.nil?
           unless asg.target_group_arns.empty?
             asg.target_group_arns.each do |arn|
-              unhealthy_targets = get_unhealthy_targets(group)
+              unhealthy_targets = get_unhealthy_targets(arn)
               return true if unhealthy_targets.any?
             end
+
+            false
           else
             raise "No target groups for autoscaling group: '#{group_name}'"
           end
