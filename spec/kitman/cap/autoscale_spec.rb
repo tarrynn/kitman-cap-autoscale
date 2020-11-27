@@ -22,6 +22,21 @@ describe Kitman::Cap::Autoscale do
     }
   end
 
+  let(:asg_without_tg) do
+    {
+      auto_scaling_group_arn: "arn:aws:autoscaling:eu-west-1:123456789012:autoScalingGroup:930d940e-891e-4781-a11a-7b0acd480f03:autoScalingGroupName/test-group-name",
+      auto_scaling_group_name: "test-group-name",
+      availability_zones: ["eu-west-1"],
+      created_time: Time.now,
+      default_cooldown: 300,
+      desired_capacity: 0,
+      health_check_type: "EC2",
+      max_size: 1,
+      min_size: 0,
+      target_group_arns: []
+    }
+  end
+
   let(:healthy_host) do
     {
       health_check_port: "80",
@@ -107,6 +122,18 @@ describe Kitman::Cap::Autoscale do
     end
 
     context 'with valid autoscaling group' do
+      context 'without target group' do
+        it 'raises error' do
+          @auto_scaling_client.stub_responses(:describe_auto_scaling_groups, {
+            auto_scaling_groups: [asg_without_tg]
+          })
+
+          expect do
+            subject.hosts_in_autoscaling_group(TEST_AUTOSCALING_GROUP_NAME)
+          end.to raise_error(RuntimeError)
+        end
+      end
+
       context 'without instances' do
         it 'returns empty list no hosts in group' do
           @auto_scaling_client.stub_responses(:describe_auto_scaling_groups, { auto_scaling_groups: [asg] })
@@ -116,7 +143,6 @@ describe Kitman::Cap::Autoscale do
       end
 
       context 'with instances' do
-
         let(:ec2_instance_1) {
           {
             public_dns_name: 'public_1.dns.name.com'
