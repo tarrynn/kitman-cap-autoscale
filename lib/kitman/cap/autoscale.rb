@@ -1,11 +1,13 @@
 require 'aws-sdk-ec2'
 require 'aws-sdk-autoscaling'
+require 'aws-sdk-elasticloadbalancingv2'
 
 module Kitman
   module Cap
     class Autoscale
       STATE_NAME_FILTER = 'instance-state-name'
       RUNNING_STATE = 'running'
+      HEALTHY_STATE = 'healthy'
 
       ACCESS_KEY_ENV_VARIABLE_NAME = 'CAPISTRANO_AWS_ACCESS_KEY'
       SECRET_KEY_ENV_VARIABLE_NAME = 'CAPISTRANO_AWS_ACCESS_SECRET_KEY'
@@ -13,30 +15,51 @@ module Kitman
 
       attr_accessor :auto_scaling_client
       attr_accessor :ec2_client
+      attr_accessor :elastic_balancing_client
 
-      def hosts_in_autoscaling_group(autoscaling_group_name)
+      def hosts_in_autoscaling_group(group_name)
         hosts = []
 
-        log "Checking autoscaling group: #{autoscaling_group_name}"
-        auto_scaling_group = get_autoscaling_group(autoscaling_group_name)
+        log "Checking autoscaling group: #{group_name}"
+        asg = get_autoscaling_group(group_name)
 
-        unless auto_scaling_group.nil?
-          log "Discovered #{auto_scaling_group.instances.count} instances"
-          auto_scaling_group.instances.each do |instance|
-            hosts << public_dns_name_from_instance_id(instance.instance_id)
+        unless asg.nil?
+          unless asg.target_group_arns.empty?
+            asg.target_group_arns.each do |arn|
+              healthy_targets = get_healthy_targets(arn)
+              log "Discovered #{healthy_targets.count} instances for target group: '#{arn}'"
+              healthy_targets.each do |instance|
+                hosts << public_dns_name_from_instance_id(instance.target.id)
+              end
+            end
+
+            log "Located hosts #{hosts.join(', ')}"
+            hosts
+          else
+            raise "No target groups for autoscaling group: '#{group_name}'"
           end
-
-          log "Located hosts #{hosts.join(', ')}"
-          hosts
         else
-          raise "Auto scaling group: '#{autoscaling_group_name}' not found"
+          raise "Autoscaling group: '#{group_name}' not found"
         end
       end
 
       def autoscaling_event_in_progress?(group_name)
-        activities = auto_scaling_client.describe_scaling_activities(auto_scaling_group_name: group_name).activities
+        asg = get_autoscaling_group(group_name)
 
-        activities.any? && activities.none? { |activity| activity.status_code.eql? 'Successful' }
+        unless asg.nil?
+          unless asg.target_group_arns.empty?
+            asg.target_group_arns.each do |arn|
+              unhealthy_targets = get_unhealthy_targets(arn)
+              return true if unhealthy_targets.any?
+            end
+
+            false
+          else
+            raise "No target groups for autoscaling group: '#{group_name}'"
+          end
+        else
+          raise "Autoscaling group: '#{group_name}' not found"
+        end
       end
 
       private
@@ -50,10 +73,27 @@ module Kitman
       end
 
       def get_autoscaling_group(autoscaling_group_name)
-        describe_auto_scaling_groups_response = auto_scaling_client.describe_auto_scaling_groups(
-          auto_scaling_group_names: [autoscaling_group_name])
+        resp = auto_scaling_client.describe_auto_scaling_groups(
+          auto_scaling_group_names: [autoscaling_group_name]
+        )
 
-        describe_auto_scaling_groups_response.auto_scaling_groups.first
+        resp.auto_scaling_groups.first
+      end
+
+      def get_healthy_targets(arn)
+        resp = elastic_balancing_client.describe_target_health({
+          target_group_arn: arn,
+        })
+
+        resp.target_health_descriptions.select { |instance| instance.target_health.state == HEALTHY_STATE }
+      end
+
+      def get_unhealthy_targets(arn)
+        resp = elastic_balancing_client.describe_target_health({
+          target_group_arn: arn,
+        })
+
+        resp.target_health_descriptions.select { |instance| instance.target_health.state != HEALTHY_STATE }
       end
 
       def public_dns_name_from_instance_id(instance_id)
@@ -79,11 +119,15 @@ module Kitman
         @ec2_client ||= Aws::EC2::Client.new(capistrano_aws_credentials)
       end
 
+      def elastic_balancing_client
+        @elastic_balancing_client ||= Aws::ElasticLoadBalancingV2::Client.new(capistrano_aws_credentials)
+      end
+
       def capistrano_aws_credentials
         @aws_credentials ||= {
+          region: ENV[REGION_ENV_VARIABLE_NAME],
           access_key_id: ENV[ACCESS_KEY_ENV_VARIABLE_NAME],
-          secret_access_key: ENV[SECRET_KEY_ENV_VARIABLE_NAME],
-          region: ENV[REGION_ENV_VARIABLE_NAME]
+          secret_access_key: ENV[SECRET_KEY_ENV_VARIABLE_NAME]
         }
 
         fail 'Capistrano AWS environment variables are missing' if @aws_credentials.values.any?(&:nil?)

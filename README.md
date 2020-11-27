@@ -1,10 +1,10 @@
 # Kitman CAP Autoscale
 
-Capistrano tasks for interacting with AWS Autoscaling 
+Capistrano tasks for interacting with AWS Autoscaling
 
 Supports two operations
 
-1. ``autoscaling_event_in_progress?`` check to see if an autoscaling acrtivity is currently in progress
+1. ``autoscaling_event_in_progress?`` check to see if an autoscaling activity is currently in progress
 2. ``hosts_in_autoscaling_group`` Retrieve the public DNS hostnames of all instances in an Autoscaling group
 
 Install
@@ -36,8 +36,7 @@ Available tasks
 ===============
 
     deploy:check_autoscaling_event_in_progress      # Check to see if an active autoscaling event is in progress
-   
+
 
 
 Copyright (c) 2016 [Kitman Labs], released under the MIT license
-
