@@ -97,73 +97,20 @@ describe Kitman::Cap::Autoscale do
   end
 
   context '#hosts_in_autoscaling_group' do
-    let(:auto_scaling_group_without_instances) {
-      {
-        auto_scaling_group_name: TEST_AUTOSCALING_GROUP_NAME,
-        launch_configuration_name: 'test launch config',
-        min_size: 10,
-        max_size: 2,
-        desired_capacity: 5,
-        default_cooldown: 0,
-        availability_zones: ['eu-west-1'],
-        health_check_type: 'ELB',
-        created_time: Time.now
-      }
-    }
-
-    let(:auto_scaling_instance_1) {
-      {
-        instance_id: 'i-1234',
-        availability_zone: 'eu-west-1a',
-        lifecycle_state: 'Running',
-        health_status: 'Healthy',
-        launch_configuration_name: 'Launch Config #1',
-        protected_from_scale_in: false
-      }
-    }
-
-    let(:auto_scaling_instance_2) {
-      {
-        instance_id: 'i-5678',
-        availability_zone: 'eu-west-1c',
-        lifecycle_state: 'Running',
-        health_status: 'Healthy',
-        launch_configuration_name: 'Launch Config #1',
-        protected_from_scale_in: false
-      }
-    }
-
-    let(:auto_scaling_group_with_instances) {
-      {
-        auto_scaling_group_name: TEST_AUTOSCALING_GROUP_NAME,
-        launch_configuration_name: 'test launch config',
-        min_size: 10,
-        max_size: 2,
-        desired_capacity: 5,
-        default_cooldown: 0,
-        availability_zones: ['eu-west-1'],
-        health_check_type: 'ELB',
-        created_time: Time.now,
-        instances: [auto_scaling_instance_1, auto_scaling_instance_2]
-      }
-    }
-
     context 'with invalid autoscaling group' do
       it 'raises error if auto scaling group not found' do
+        @auto_scaling_client.stub_responses(:describe_auto_scaling_groups, { auto_scaling_groups: [] })
         expect do
           subject.hosts_in_autoscaling_group(TEST_AUTOSCALING_GROUP_NAME)
-        end.to raise_error("Auto scaling group: 'test-group-name' not found")
+        end.to raise_error(RuntimeError)
       end
     end
 
     context 'with valid autoscaling group' do
-
       context 'without instances' do
-        before(:each) do
-          @stub_auto_scaling_client.stub_responses(:describe_auto_scaling_groups, auto_scaling_groups: [auto_scaling_group_without_instances])
-        end
-
         it 'returns empty list no hosts in group' do
+          @auto_scaling_client.stub_responses(:describe_auto_scaling_groups, { auto_scaling_groups: [asg] })
+          @elastic_balancing_client.stub_responses(:describe_target_health, { target_health_descriptions: [] })
           expect(subject.hosts_in_autoscaling_group(TEST_AUTOSCALING_GROUP_NAME)).to eq([])
         end
       end
@@ -182,17 +129,19 @@ describe Kitman::Cap::Autoscale do
           }
         }
 
-        before(:each) do
-          @stub_auto_scaling_client.stub_responses(:describe_auto_scaling_groups, auto_scaling_groups: [auto_scaling_group_with_instances])
-        end
-
         it 'returns hosts from group' do
-          @stub_ec2_client.stub_responses(:describe_instances,
+          @auto_scaling_client.stub_responses(:describe_auto_scaling_groups, { auto_scaling_groups: [asg] })
+          @elastic_balancing_client.stub_responses(:describe_target_health, {
+            target_health_descriptions: [healthy_host, healthy_host]
+          })
+          @ec2_client.stub_responses(:describe_instances,
                                           {reservations: [{instances: [ec2_instance_1]}]},
                                           {reservations: [{instances: [ec2_instance_2]}]},
           )
 
-          expect(subject.hosts_in_autoscaling_group(TEST_AUTOSCALING_GROUP_NAME)).to eq(['public_1.dns.name.com', 'public_2.dns.name.com'])
+          expect(subject.hosts_in_autoscaling_group(TEST_AUTOSCALING_GROUP_NAME)).to eq(
+            ['public_1.dns.name.com', 'public_2.dns.name.com']
+          )
         end
       end
     end
