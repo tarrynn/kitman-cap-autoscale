@@ -155,7 +155,17 @@ describe Kitman::Cap::Autoscale do
           }
         }
 
-        it 'returns hosts from group' do
+        let(:ec2_instance_3) {
+          {
+            public_dns_name: 'public_3.dns.name.com'
+          }
+        }
+
+        after do
+          ENV['ALL_HOSTS'] = nil
+        end
+
+        it 'returns healthy hosts from group' do
           @auto_scaling_client.stub_responses(:describe_auto_scaling_groups, { auto_scaling_groups: [asg] })
           @elastic_balancing_client.stub_responses(:describe_target_health, {
             target_health_descriptions: [healthy_host, healthy_host]
@@ -167,6 +177,23 @@ describe Kitman::Cap::Autoscale do
 
           expect(subject.hosts_in_autoscaling_group(TEST_AUTOSCALING_GROUP_NAME)).to eq(
             ['public_1.dns.name.com', 'public_2.dns.name.com']
+          )
+        end
+
+        it 'returns all hosts from group' do
+          ENV['ALL_HOSTS'] = "1"
+          @auto_scaling_client.stub_responses(:describe_auto_scaling_groups, { auto_scaling_groups: [asg] })
+          @elastic_balancing_client.stub_responses(:describe_target_health, {
+            target_health_descriptions: [healthy_host, healthy_host, unhealthy_host]
+          })
+          @ec2_client.stub_responses(:describe_instances,
+                                          {reservations: [{instances: [ec2_instance_1]}]},
+                                          {reservations: [{instances: [ec2_instance_2]}]},
+                                          {reservations: [{instances: [ec2_instance_3]}]},
+          )
+
+          expect(subject.hosts_in_autoscaling_group(TEST_AUTOSCALING_GROUP_NAME)).to eq(
+            ['public_1.dns.name.com', 'public_2.dns.name.com', 'public_3.dns.name.com']
           )
         end
       end
