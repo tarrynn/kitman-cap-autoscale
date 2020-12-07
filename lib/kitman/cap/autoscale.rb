@@ -85,7 +85,11 @@ module Kitman
           target_group_arn: arn,
         })
 
-        resp.target_health_descriptions.select { |instance| instance.target_health.state == HEALTHY_STATE }
+        if ENV['ALL_HOSTS']
+          resp.target_health_descriptions
+        else
+          resp.target_health_descriptions.select { |instance| instance.target_health.state == HEALTHY_STATE }
+        end
       end
 
       def get_unhealthy_targets(arn)
